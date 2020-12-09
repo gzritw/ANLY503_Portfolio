@@ -1,0 +1,37 @@
+name: "my-website"
+navbar:
+  title: "Zhengrong's Website"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "Project"
+      href: project.html
+    - text: "Homework"  
+      menu:
+        - text: "Hw4"
+          href: Hw4.html
+        - text: "Hw5"
+          menu:
+            - text: "task1"
+              href: Hw5task1.html
+            - text: "task2"
+              href: Hw5task2.html
+            - text: "task3"
+              href: Hw5task3.html
+            - text: "task4"
+              href: Hw5task4.html
+            - text: "task5"
+              href: Hw5task5.html
+        - text: "Hw6"
+          menu:
+            - text: "Penn"
+              href: Penn.html
+            - text: "California"
+              href: California.html
+            - text: "Texas"
+              href: Texas.html
+        - text: "Hw7"
+          href: Hw7.html
+            
+      
+output_dir: "docs"

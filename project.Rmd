@@ -1,0 +1,324 @@
+---
+title: "Fly to eat? Here is the guidance."
+output: 
+  flexdashboard::flex_dashboard:
+    navbar:
+      - { icon: "fa-backward", href: "https://gzritw.github.io/ANLY503_Portfolio/", align: right}
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(xtable)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(plyr)
+library(plotly)
+library(gridExtra) 
+library(boot) 
+library(car) 
+library(ggrepel)
+library(scales) 
+library(lubridate) 
+library(tools) 
+library(tm) 
+library(SnowballC)
+library(wordcloud)
+library(tidytext)
+library(ggplot2)
+library(sf)
+library(tidygraph)
+library(igraph)
+library(readxl)
+library(ggraph)
+
+# read dataset
+routes <- read_csv("./data/routes.csv", col_names = T)
+airports <- read_csv("./data/airports-extended.csv", col_names = F)
+airlines <- read_csv("./data/airlines.csv", col_names = T)
+rstr <- read_csv("./data/TA_restaurants_curated.csv")
+
+# rename columns
+colnames(routes) <- c("IATA", "IATA_id", "source_airport", "source_airport_id", "destination_airport", 
+                      "destination_airport_id", "code_share", "stops", "equipment")
+colnames(airports) <- c("id","airport_name",'city_name','country_name','IATA','ICAO',
+                        'lat','long','altitude','tz_offset','DST','tz_name','airport_type','source_data')
+colnames(rstr)[which(names(rstr) == "Cuisine Style")] = "Cuisine_Style"
+colnames(rstr)[which(names(rstr) == "Price Range")] = "Price_Range"
+colnames(rstr)[which(names(rstr) == "Number of Reviews")] = "Review_Num"
+# airports dataset filter left only airport type
+airports <- airports %>% filter(airport_type == "airport")
+# ensure consistency for future merge
+airports[airports$country_name=='United States','country_name']<-'USA'
+airports[airports$country_name=='United Kingdom','country_name']<-'UK'
+# select active airlines and merge datasets
+airlines.active <- airlines[airlines["Active"]=="Y",]
+tmp <- merge(routes, airlines.active %>% select(IATA, Name, Country), by='IATA', all.x = TRUE)
+tmp <- merge(tmp, airports, by.x = "source_airport", by.y = "IATA")
+df <- merge(tmp, airports, by.x = "destination_airport", by.y = "IATA")
+# drop unncessary columns
+df <- df[-c(7, 8, 9, 20, 21, 22, 23, 24, 33, 34, 35, 36, 37)]
+rstr <- rstr[-c(1, 10, 11)]
+# rename df columns
+colnames(df)[3] <- "airline_IATA"
+colnames(df)[4] <- "airline_IATA_id"
+colnames(df)[7] <- 'airline_name'
+colnames(df)[8] <- 'airline_country'
+# remove national routes
+df <- subset(df, country_name.x != country_name.y)
+euro.list <- c("Albania", "Andorra", "Armenia", "Austria", "Azerbaijan", "Belarus", "Belgium", "Bosnia and Herzegovina", 
+               "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France", "Georgia", "Germany",
+               "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Kazakhastan", "Kosovo", "Latvia", "Liechtenstein", 
+               "lithuania", "Luxembourg", "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands", "North Macedonia", "Norway", 
+               "Poland", "Portugal", "Romania", "San Marino", "Serbia", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", 
+               "Turkey", "Ukraine", "UK", "Vatican City")
+# add country to the restaurant
+df_sub <- select(df, city_name.x, country_name.x)
+df_sub <- subset(df_sub, is.element(df_sub$country_name.x, euro.list))
+df_sub <- df_sub[-which(duplicated(df_sub)), ]
+rstr <- merge(rstr, df_sub, by.x = "City", by.y = "city_name.x")
+# remove duplicated rows
+rstr <- distinct((rstr))
+```
+
+
+About{data-orientation=columns}
+===================================== 
+Column1 {data-width=700}
+-----------------------------------------------------------------------
+
+### About
+```{r}
+library("ggplot2")
+theme_set(theme_bw())
+library("sf")
+library("rnaturalearth")
+library("rnaturalearthdata")
+world <- ne_countries(scale = "medium", returnclass = "sf")
+sites <- data.frame(long = df$long.x, lat = df$lat.x)
+
+# airports
+plain <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank(),
+  panel.background = element_rect(fill = "white")
+)
+
+P1 <- ggplot(data = world) +
+  geom_sf(aes(fill = pop_est/10000000)) +
+  scale_fill_continuous(name="Population(10 millions)", 
+                        low = "#e1d9c6", high = "#5b7c8e", na.value = "grey50") +
+  geom_point(data = sites, aes(x = long, y = lat), 
+             size = 0.3, color = "#fe9e59", fill = "grey", alpha = 0.2)+
+  labs(fill="population", title="International Airports in the World", 
+       subtitle = "with population distribution worldwide",
+       caption = "Data source: Openflight.org")+
+  theme(
+    plot.title = element_text(color = "#5b7c8e", face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(color = "grey50", hjust = 0.5),
+    plot.caption = element_text(color = "grey50", face = "italic"))+
+  plain
+P1
+```
+
+Column2{data-width=300}
+-----------------------------------------------------------------------
+
+### About
+Introduction:
+
+I know travel plans are impacted right now due to the travel restrictions under the pandemic. But to fulfill your wanderlust, I'll share the story that can inspire your next adventure. 
+
+Looking at the international airports in the world, East Asia, Americas and Europe have the most of them. Considering the population density, it is noticeable that European countries have a great many airports. It is of course nice to know that if you've fantasized about eating your way through Europe. From rich stews in the Balkans, to seafood in the Mediterranean, to savory cheeses throughout, the continent is a foodie's dreamland.
+
+Ready to know more about flights between major European countries and restaurants reviews by other foodies? Let's get started!
+
+
+Data source and acknowledgements:
+
+The story is based on datasets downloaded from Openflights.org and TripAdvisor under the open database license. They can be also found on Kaggle:  https://www.kaggle.com/open-flights/flight-route-database, https://www.kaggle.com/open-flights/airports-train-stations-and-ferry-terminals, https://www.kaggle.com/open-flights/airline-database, https://www.kaggle.com/damienbeneschi/krakow-ta-restaurans-data-raw.
+
+Software and package version:
+RStudio: 1.3.1093, flexdashboard: 0.5.2, xtable: 1.8.4, dplyr:1.0.2, tidyr: 1.1.2, tidyverse:1.3.0, stringr: 1.4.0, plyr: 1.8.6, plotly:4.9.2.1, gridExtra: 2.3, boot: 1.3.25, car: 3.0.10, ggrepel: 0.8.2, scales: 1.1.1, lubridate: 1.7.9, tools: 4.0.3, tm: 0.7.8, SnowballC: 0.7.0, wordcloud: 2.6, tidytext: 0.2.6, ggplot2: 3.3.2, sf: 0.9.6, tidygraph: 1.2.0, igraph: 1.2.6, readxl: 1.3.1, ggraph: 2.0.3
+
+Flights Network{data-orientation=rows}
+===================================== 
+
+Row1 {data-height=700}
+-----------------------------------------------------------------------
+
+### Most Frequent Flights
+
+```{r}
+# find those top 10 countries who have most restaurants reviews in the dataframe
+rstr.euro.list <- c("Switzerland", "Netherlands", "Poland", "Austria", "Portugal", "Italy", "Germany", "France", "Spain", "UK")
+euro.routes  <- subset(df, is.element(df$country_name.x, rstr.euro.list)  & is.element(df$country_name.y, rstr.euro.list))
+
+# add column which counts flights
+euro.routes.network <- euro.routes %>% 
+  group_by(euro.routes["country_name.x"], euro.routes["country_name.y"]) %>% tally()
+
+# plot the network
+graph <- as_tbl_graph(euro.routes.network)
+graph <- graph %>%
+  activate(nodes) %>%
+  mutate(
+    title = str_to_title(name),
+    label = str_replace_all(title, " ", "\n")
+  )
+
+thm <- theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    panel.grid = element_blank(),
+    panel.grid.major = element_blank(),
+  ) 
+theme_set(thm)
+
+ggraph(graph) +
+  geom_edge_link(aes(width=n, color = from,edge_alpha = n),
+                 arrow = arrow(length = unit(0.1, 'inches'))) +
+  geom_node_text(aes(label = label)) +
+  geom_node_point(color="#fe9e59", alpha =0.5, size = 3)+
+  ggtitle("Most Frequent Flights Between Selected European Countries")+
+  theme(plot.title = element_text(color = "#5b7c8e"))
+
+theme_set(thm)
+```
+
+### Review Amount
+
+```{r}
+x10 <- sort(table(rstr$country_name.x))
+# top 10 most restaurant reviews countries in Europe
+x10 <- sort(table(rstr$country_name.x))[11:20]
+# plot counts of earthquakes by magnitude
+barplot(x10, horiz = TRUE, main="Restaurant Review Amount in European Countries",
+        col = "#5b7c8e", col.main="#5b7c8e", border = '#fe9e59',density = 80,
+        xlab="Number of Reviews", xlim = c(0, 20000),las = 1, cex.names = 0.7)
+
+
+```
+
+Row2{data-height=300}
+-----------------------------------------------------------------------
+
+### Analysis
+Among more-than-forty European countries, based on TripAdvisor, these ten countries have most restaurant reviews: United Kingdom, Spain, France, Germany, Italy, Portugal, Austria, Poland, Netherlands and Switzerland. If you don't have specific reason to a specifc country in Europe, these ten could be on your list.
+
+Speaking of these countries, there are plenty of mouth-watering food. If you want to eat local and traditional fish and chips in UK, paella in Spain, macarons in France, beef stew in Germany, pasta in Italy, the plot of flights network between the above-mentioned ten countries is a good guidance. It describes the amount of flights between two countries by density and width of line between them. All the ten countries have connections and  noticeably, UK and Spain, Spain and Germany, Germany and Italy have very strong connections. So, if your vocation is short or want to enjoy a in-depth travel, UK, Spain, Germany and Italy could be on the top of the list.
+
+
+
+Restaurant Info{data-orientation=rows}
+===================================== 
+Row1 {data-width=700}
+-------------------------------------
+
+### Ranking, Rating and Price 
+```{r}
+# remove duplicated rows
+rstr <- distinct((rstr))
+
+# relationship between ranking, rating and price range
+rstr_bx <- rstr[!is.na(rstr$Price_Range), ]
+rstr_bx$Price_Range[rstr_bx$Price_Range == "$"] <- "low"
+rstr_bx$Price_Range[rstr_bx$Price_Range == "$$ - $$$"] <- "medium"
+rstr_bx$Price_Range[rstr_bx$Price_Range == "$$$$"] <- "high"
+fig_bx <- plot_ly(rstr_bx, x = ~Rating, y = ~Ranking,color = ~Price_Range,type = "box",  
+                  colors =  c("grey50", "#5b7c8e", "#fe9e59")) %>% 
+  layout(boxmode = "group", title = "Ranking vs Rating with Price Range")
+
+
+fig_bx
+```
+
+Row2 {data-width=300}
+-------------------------------------
+### Analysis
+Here is an overview of restaurants regard of their ranking, rating and price range. For restaurants rated more than three stars, the price of food, restaurant ranking and restaurant rating are positively related. For example, if restaurants are all five stars, generally, the higher the ranking, the more expensive the restaurants would be. Or if restaurants are all four dollar signs, generally, the higher ranked restaurants has more stars. So, if you choose restaurants more than three stars, just pick the one you like and the one you can afford. Most of the time, the food will worth the price. 
+
+I mean most of the time, yes, this is because there is exceptional cases even when restaurants are more than three stars. Their rankings may be very low, more than 10k, or their food could just cost you very little money. So, never judge the restaurant only by a single comment or metric. Downloading Apps like TripAdvisor where there are lots of reviews to refer to and reading data-based guidance like this, would be a smart choice.
+
+For restaurants rated less than three stars, sometimes, restaurants cost you little still ranked high, still deserve a visit. Sometimes, very expensive restaurants are just so-so or even worse than little-cost restaurants.
+
+
+Review Info{data-orientation=rows}
+===================================== 
+
+Row1 {.tabset}{data-height=700}
+-----------------------------------------------------------------------
+
+### Peak Season
+```{r}
+#extract the reviews
+rstr$Review_Text <- gsub('.{31}$', '', rstr$Reviews) 
+# remove punctuations
+rstr$Review_Text <- gsub("[[:punct:]]+","",rstr$Review_Text) 
+
+# extract dates from the end (without NAs)
+dates <- str_sub(rstr$Reviews, start = -27)
+rstr$Date1 <- gsub('.{17}$', '', dates)
+rstr$Date1 <- gsub("[[:punct:]]+","",rstr$Date1)
+rstr$Date1 <- mdy(rstr$Date1)
+
+
+tmp2 <- rstr %>% group_by(rstr["country_name.x"],rstr["Date1"]) %>% tally()
+# based on the EDA, we picked the timeline from 2017-01 to 2018-02
+date1 <- tmp2[tmp2$Date1 >= "2017-01-01" & tmp2$Date1 <= "2018-01-31",]
+
+# review amount over time
+rstr.euro.list <- c("Switzerland", "Netherlands", "Poland", "Austria", "Portugal", "Italy", "Germany", "France", "Spain", "UK")
+d2 <- date1%>% group_by(country_name.x, month = floor_date(Date1, "month")) %>%summarise(total = sum(n))
+fig2<-plot_ly()
+
+x <- list(title = "Time")
+y <- list(title = "Review Amount")
+fig2 <- fig2 %>% layout(title = "Review Amount over Time", xaxis = x, yaxis = y)
+for(cty in rstr.euro.list){
+  tmp_cty <- d2[d2$country_name.x==cty,]
+  fig2 <- fig2 %>% add_trace(x=tmp_cty$month,y = tmp_cty$total, name = cty,mode = 'lines')
+}
+fig2
+```
+
+
+
+### Word Cloud
+```{r}
+# convert the reviews to a corpus for pre-processing
+corpus=VCorpus(VectorSource(rstr$Review_Text))
+corpus=tm_map(corpus,tolower)
+corpus=tm_map(corpus,removePunctuation)
+corpus=tm_map(corpus,removeWords, stopwords("english"))
+corpus=tm_map(corpus, stripWhitespace)
+corpus=tm_map(corpus, PlainTextDocument)
+
+#Create a matrix where the rows are the words and the columns are the frequencies
+textmatrix=DocumentTermMatrix(corpus)
+newtextmatrix = removeSparseTerms(textmatrix, 0.998) 
+bagofwords=as.data.frame(as.matrix(newtextmatrix))
+wordcloud(colnames(bagofwords),colSums(bagofwords),scale=c(3.8,0.85),
+          random.order=FALSE, rot.per=0.35,max.words = 100, colors=brewer.pal(8, "Dark2"))
+```
+
+Row3 {data-height=300}
+-----------------------------------------------------------------------
+
+### Analysis
+When looking at the reviews of these restaurants from 2017 Jan to 2018 Jan, we find TripAdvisor become popular as time goes by, and in December 2017, there were most people to leave reviews on this platform. This mainly because December is the heated season for tourism (except 2020). 
+
+We can also find the amount of selected ten countries restaurants reviews separately over time. United Kingdom, as the most heated country, also has the most amount of reviews on TripAdvisor, followed by France and Spain. These countries really worth a visit.
+
+When looking into details of these reviews, we can find the most used words when commented. The wordcloud plot shows that, besides words like "food", "good", "best", "nice", "service" and "staff" are often mentioned by reviewers. Thus, from restaurants' side, improving service would be a good way to attract more people to visit the restaurant.
+
+
+This is the guidance for taking flights and choosing restaurants in Europe. Thank you for reading.
+

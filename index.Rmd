@@ -1,0 +1,16 @@
+---
+title: "Zhengrong's Website"
+output: 
+  html_document:
+    theme: cerulean
+---
+
+Hello! Welcome to Zhengrong's data visualization website!
+
+This website is data visualization work, energized by images and stories of various data analysis. Topics and techniques are also varied, from personal bank account information, to European restaurants reviews, with packages such as ggplot, plotly in both R and Python.
+
+Under the "Project" tab, there is a project about analyzing international flights and European restaurants reviews in recent years. With vivid visualization, this would provide guidance about European tours for foodies.
+
+Under the "Homework" tab, there are various work conducted in ANLY503 Data Vis course. 
+
+It is my hope that the data visualization work here is interesting and insightful to you. Have a wonderful data visualization tour!
